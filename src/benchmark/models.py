@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
+
 from tabpfn import TabPFNClassifier
 from tabpfn import TabPFNRegressor
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import AutoTabPFNClassifier
