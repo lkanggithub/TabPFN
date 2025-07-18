@@ -59,7 +59,7 @@ def evaluate_with_cv(
 ) -> List[CVEvaluationResult]:
     cv = KFold(n_splits=num_of_folds, shuffle=True, random_state=1234)
     cv_scores = cross_val_score(
-        estimator=model_wrapper.pipeline,
+        estimator=model_wrapper.model,
         X=dataset.get_train_data_x(),
         y=dataset.get_train_data_y(),
         cv=cv,

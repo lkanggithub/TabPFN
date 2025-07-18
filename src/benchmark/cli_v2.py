@@ -1,4 +1,5 @@
 import logging
+import traceback
 from pathlib import Path
 from typing import List
 
@@ -8,11 +9,12 @@ from dr_model_benchmark.tools.openml.utils import get_openml_study
 from dr_model_benchmark.tools.openml.utils import get_openml_task
 from dr_model_benchmark.tools.openml.utils import get_train_test_sets_of_openml_dataset
 from dr_model_benchmark.common.analysis.entities import TestResultV2
+from dr_model_benchmark.common.enums import DeviceType
 from dr_model_benchmark.common.enums import MetricType
 from dr_model_benchmark.common.enums import PartitionType
 from dr_model_benchmark.common.enums import TargetType
 from dr_model_benchmark.common.profile.entities import TimeProfile
-from dr_model_benchmark.common.profile.entities import TimeProfiler
+from dr_model_benchmark.common.profile.utils import TimeProfiler
 
 from benchmark.entities import Dataset
 from benchmark.entities import TabPFNTestReport
@@ -94,7 +96,7 @@ def run_cli(
 
     openml_study = get_openml_study(openml_study_id)
     logger.info(f"Total {len(openml_study.tasks)} task(s) to test.")
-    dataset_test_reports: List[TabICLTestReport] = []
+    dataset_test_reports: List[TabPFNTestReport] = []
     for openml_task_id in openml_study.tasks:
         openml_task = get_openml_task(openml_task_id)
         openml_dataset = openml_task.get_dataset()
@@ -114,28 +116,33 @@ def run_cli(
             False,
             DeviceType.from_string(device_type),
         )
-        cv_evaluation_results = evaluate_with_cv(
-            model_wrapper,
-            dataset,
-            5,
-            target_type,
-            training_metric_type,
-        )
-        # train
-        model_wrapper = get_tabpfn_model_wrapper(
-            target_type,
-            folder_of_pretrained_models,
-            use_tabpfn_extension,
-            False,
-            DeviceType.from_string(device_type),
-        )
-        train_fit_time_profile = TimeProfile(PartitionType.TRAIN.name)
-        with TimeProfiler(train_fit_time_profile):
-            model_wrapper.fit(dataset)
-        # test with holdout
-        holdout_predict_time_profile = TimeProfile(PartitionType.HOLDOUT.name)
-        with TimeProfiler(holdout_predict_time_profile):
-            prediction_outputs = model_wrapper.inference(dataset)
+        try:
+            cv_evaluation_results = evaluate_with_cv(
+                model_wrapper,
+                dataset,
+                5,
+                target_type,
+                training_metric_type,
+            )
+            # train
+            model_wrapper = get_tabpfn_model_wrapper(
+                target_type,
+                folder_of_pretrained_models,
+                use_tabpfn_extension,
+                False,
+                DeviceType.from_string(device_type),
+            )
+            train_fit_time_profile = TimeProfile(PartitionType.TRAIN.name)
+            with TimeProfiler(train_fit_time_profile):
+                model_wrapper.fit(dataset)
+            # test with holdout
+            holdout_predict_time_profile = TimeProfile(PartitionType.HOLDOUT.name)
+            with TimeProfiler(holdout_predict_time_profile):
+                prediction_outputs = model_wrapper.inference(dataset)
+        except:
+            print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> CV fails: {openml_dataset.name}")
+            traceback.print_stack()
+            continue
 
         evaluation_metric_types = [
             MetricType.from_string(metric) for metric in evaluation_metrics.split(",")
@@ -151,7 +158,7 @@ def run_cli(
 
         # analysis and report
         dataset_test_reports.append(
-            TabICLTestReport(
+            TabPFNTestReport(
                 openml_dataset.name,
                 cv_evaluation_results,
                 holdout_evaluation_results,
@@ -163,7 +170,7 @@ def run_cli(
     # report
     TestResultV2.to_csv(
         [
-            TabICLTestReport.to_test_result(dataset_test_report)
+            TabPFNTestReport.to_test_result(dataset_test_report)
             for dataset_test_report in dataset_test_reports
         ],
         Path(output_report_path),

@@ -25,6 +25,10 @@ class ModelWrapper:
         )
         self.inference_only = inference_only
 
+    @staticmethod
+    def is_binary_classification_output(prediction_proba_values: np.ndarray) -> bool:
+        return prediction_proba_values.shape[1] == 2
+
     def fit(self, dataset: Dataset) -> "ModelWrapper":
         if self.inference_only:
             return self
