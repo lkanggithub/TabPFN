@@ -65,21 +65,21 @@ def infer_classification_target_type(
     type=str,
     required=False,
     default="",
-    help="",
+    help="Folder of pretrained models",
 )
 @click.option(
     "--use_tabpfn_extension",
     type=bool,
     required=False,
     default=False,
-    help="",
+    help="Set to True if it uses TabPFN extension",
 )
 @click.option(
     "--device_type",
     type=click.Choice([device_type.name for device_type in DeviceType]),
     required=False,
     default=DeviceType.AUTO,
-    help="",
+    help="Device type",
 )
 def run_cli(
     openml_study_id: int,
@@ -104,7 +104,6 @@ def run_cli(
         task_target_name = openml_task.target_name
         target_type = infer_classification_target_type(train_dataframe, task_target_name)
         dataset = Dataset(train_dataframe, test_dataframe, task_target_name)
-        print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {openml_dataset.name}")
         logger.info(f"Processing task {openml_dataset.name}")
 
         # cross validation
@@ -140,7 +139,7 @@ def run_cli(
             with TimeProfiler(holdout_predict_time_profile):
                 prediction_outputs = model_wrapper.inference(dataset)
         except:
-            print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> CV fails: {openml_dataset.name}")
+            logger.error(f"CV fails: {openml_dataset.name}")
             traceback.print_stack()
             continue
 
