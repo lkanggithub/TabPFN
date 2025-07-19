@@ -81,6 +81,14 @@ def infer_classification_target_type(
     default=DeviceType.AUTO,
     help="Device type",
 )
+@click.option(
+    "--openml_task_names_to_exclude",
+    type=str,
+    required=False,
+    default="",
+    help="names of tasks to be excluded from testings",
+)
+
 def run_cli(
     openml_study_id: int,
     training_metric: str,
@@ -89,6 +97,7 @@ def run_cli(
     folder_of_pretrained_models: str,
     use_tabpfn_extension: bool,
     device_type: str,
+    openml_task_names_to_exclude: str,
 ) -> None:
     folder_of_pretrained_models = (
         Path(folder_of_pretrained_models) if folder_of_pretrained_models else None
@@ -97,14 +106,20 @@ def run_cli(
     openml_study = get_openml_study(openml_study_id)
     logger.info(f"Total {len(openml_study.tasks)} task(s) to test.")
     dataset_test_reports: List[TabPFNTestReport] = []
+    openml_task_names_to_exclude = set(openml_task_names_to_exclude.split(","))
     for openml_task_id in openml_study.tasks:
         openml_task = get_openml_task(openml_task_id)
         openml_dataset = openml_task.get_dataset()
+        openml_dataset_name = openml_dataset.name
+        if openml_dataset_name in openml_task_names_to_exclude:
+            logger.info(f"Skipped task: {openml_dataset_name} is not supported by TabPFN.")
+            continue
+
         train_dataframe, test_dataframe = get_train_test_sets_of_openml_dataset(openml_task)
         task_target_name = openml_task.target_name
         target_type = infer_classification_target_type(train_dataframe, task_target_name)
         dataset = Dataset(train_dataframe, test_dataframe, task_target_name)
-        logger.info(f"Processing task {openml_dataset.name}")
+        logger.info(f"Processing task {openml_dataset_name}")
 
         # cross validation
         training_metric_type = MetricType.from_string(training_metric)
@@ -139,8 +154,7 @@ def run_cli(
             with TimeProfiler(holdout_predict_time_profile):
                 prediction_outputs = model_wrapper.inference(dataset)
         except:
-            logger.error(f"CV fails: {openml_dataset.name}")
-            traceback.print_stack()
+            logger.exception(f"CV fails: {openml_dataset.name}")
             continue
 
         evaluation_metric_types = [
