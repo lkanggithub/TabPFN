@@ -1,5 +1,4 @@
 import logging
-import traceback
 from pathlib import Path
 from typing import List
 
@@ -8,6 +7,7 @@ import pandas as pd
 from dr_model_benchmark.tools.openml.utils import get_openml_study
 from dr_model_benchmark.tools.openml.utils import get_openml_task
 from dr_model_benchmark.tools.openml.utils import get_train_test_sets_of_openml_dataset
+from dr_model_benchmark.tools.openml.utils import is_classification_task
 from dr_model_benchmark.common.analysis.entities import TestResultV2
 from dr_model_benchmark.common.enums import DeviceType
 from dr_model_benchmark.common.enums import MetricType
@@ -18,7 +18,6 @@ from dr_model_benchmark.common.profile.utils import TimeProfiler
 
 from benchmark.entities import Dataset
 from benchmark.entities import TabPFNTestReport
-from benchmark.models import ModelWrapper
 from benchmark.evaluations import evaluate_with_cv
 from benchmark.evaluations import evaluate_on_inference_result
 from benchmark.models import get_tabpfn_model_wrapper
@@ -117,7 +116,10 @@ def run_cli(
 
         train_dataframe, test_dataframe = get_train_test_sets_of_openml_dataset(openml_task)
         task_target_name = openml_task.target_name
-        target_type = infer_classification_target_type(train_dataframe, task_target_name)
+        if is_classification_task(openml_task):
+            target_type = infer_classification_target_type(train_dataframe, task_target_name)
+        else:
+            target_type = TargetType.REGRESSION
         dataset = Dataset(train_dataframe, test_dataframe, task_target_name)
         logger.info(f"Processing task {openml_dataset_name}")
 

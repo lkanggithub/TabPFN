@@ -50,7 +50,7 @@ class ModelWrapper:
 
         prediction_proba_values = (
             prediction_proba_values[:, 1]
-            if self.is_binary_classification_output(prediction_proba_values)
+            if prediction_proba_values and self.is_binary_classification_output(prediction_proba_values)
             else prediction_proba_values
         )
 
