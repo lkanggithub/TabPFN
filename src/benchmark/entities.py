@@ -5,10 +5,12 @@ import numpy as np
 import pandas as pd
 
 from dr_model_benchmark.common.analysis.entities import ModelScoreMetrics
+from dr_model_benchmark.common.analysis.entities import ModelTimeProfiles
 from dr_model_benchmark.common.analysis.entities import TestResultV2
 from dr_model_benchmark.common.analysis.enums import Partition
 from dr_model_benchmark.common.enums import MetricType
 from dr_model_benchmark.common.profile.entities import TimeProfile
+from dr_model_benchmark.common.profile.enums import TimeProfileType
 
 
 class Dataset:
@@ -79,8 +81,21 @@ class TabPFNTestReport:
             [time_profile.time_ellipse.to_float() for time_profile in self.train_time_profile]
         )
 
+    def total_train_time(self) -> np.floating:
+        return np.sum(
+            [time_profile.time_ellipse.to_float() for time_profile in self.train_time_profile]
+        )
+
     def median_test_set_predict_time(self) -> np.floating:
         return np.median(
+            [
+                time_profile.time_ellipse.to_float()
+                for time_profile in self.test_set_predict_time_profile
+            ]
+        )
+
+    def total_test_set_predict_time(self) -> np.floating:
+        return np.sum(
             [
                 time_profile.time_ellipse.to_float()
                 for time_profile in self.test_set_predict_time_profile
@@ -103,7 +118,20 @@ class TabPFNTestReport:
                 for evaluate_result in self.test_set_evaluation_results
             ]
         )
+        model_time_profiles = [
+            ModelTimeProfiles(
+                TimeProfileType.TOTAL_CLOCK_TIME,
+                Partition.TRAIN,
+                Seconds(self.total_train_time()),
+            ),
+            ModelTimeProfiles(
+                TimeProfileType.TOTAL_CLOCK_TIME,
+                Partition.TEST,
+                Seconds(self.total_test_set_predict_time()),
+            ),
+        ]
         return TestResultV2(
             dataset_name=self.name,
             model_score_metrics=model_score_metrics,
+            model_time_profiles=model_time_profiles,
         )

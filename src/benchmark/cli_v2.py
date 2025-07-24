@@ -9,9 +9,9 @@ from dr_model_benchmark.tools.openml.utils import get_openml_task
 from dr_model_benchmark.tools.openml.utils import get_train_test_sets_of_openml_dataset
 from dr_model_benchmark.tools.openml.utils import is_classification_task
 from dr_model_benchmark.common.analysis.entities import TestResultV2
+from dr_model_benchmark.common.analysis.enums import Partition
 from dr_model_benchmark.common.enums import DeviceType
 from dr_model_benchmark.common.enums import MetricType
-from dr_model_benchmark.common.enums import PartitionType
 from dr_model_benchmark.common.enums import TargetType
 from dr_model_benchmark.common.profile.entities import TimeProfile
 from dr_model_benchmark.common.profile.utils import TimeProfiler
@@ -148,11 +148,11 @@ def run_cli(
                 False,
                 DeviceType.from_string(device_type),
             )
-            train_fit_time_profile = TimeProfile(PartitionType.TRAIN.name)
+            train_fit_time_profile = TimeProfile(Partition.TRAIN.name)
             with TimeProfiler(train_fit_time_profile):
                 model_wrapper.fit(dataset)
             # test with holdout
-            holdout_predict_time_profile = TimeProfile(PartitionType.HOLDOUT.name)
+            holdout_predict_time_profile = TimeProfile(Partition.TEST.name)
             with TimeProfiler(holdout_predict_time_profile):
                 prediction_outputs = model_wrapper.inference(dataset)
         except:
