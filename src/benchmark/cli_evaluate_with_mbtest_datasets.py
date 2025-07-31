@@ -8,7 +8,6 @@ import pandas as pd
 from dr_model_benchmark.common.analysis.entities import TestResultV2
 from dr_model_benchmark.common.analysis.enums import Partition
 from dr_model_benchmark.common.enums import DeviceType
-from dr_model_benchmark.common.enums import MetricType
 from dr_model_benchmark.common.profile.entities import TimeProfile
 from dr_model_benchmark.common.profile.utils import TimeProfiler
 from dr_model_benchmark.common.entities import DataRobotMBTestDatasetConfig
@@ -31,7 +30,7 @@ def get_dataset_name(dataset_path: Path) -> str:  # FIXME
 @click.command()
 @click.option(
     "--datarobot_mbtest_yaml_path",
-    type=int,
+    type=str,
     required=True,
     help="Path to a DataRobot mbtest yaml file",
 )
