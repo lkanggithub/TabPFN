@@ -4,17 +4,14 @@ from typing import List
 
 import click
 import pandas as pd
-from dr_model_benchmark.tools.openml.utils import get_openml_study
-from dr_model_benchmark.tools.openml.utils import get_openml_task
-from dr_model_benchmark.tools.openml.utils import get_train_test_sets_of_openml_dataset
-from dr_model_benchmark.tools.openml.utils import is_classification_task
+
 from dr_model_benchmark.common.analysis.entities import TestResultV2
 from dr_model_benchmark.common.analysis.enums import Partition
 from dr_model_benchmark.common.enums import DeviceType
 from dr_model_benchmark.common.enums import MetricType
-from dr_model_benchmark.common.enums import TargetType
 from dr_model_benchmark.common.profile.entities import TimeProfile
 from dr_model_benchmark.common.profile.utils import TimeProfiler
+from dr_model_benchmark.common.entities import DataRobotMBTestDatasetConfig
 
 from benchmark.entities import Dataset
 from benchmark.entities import TabPFNTestReport
@@ -26,32 +23,17 @@ from benchmark.models import get_tabpfn_model_wrapper
 logger = logging.getLogger(__name__)
 
 
-def infer_classification_target_type(
-    classification_train_data: pd.DataFrame, target_name: str
-) -> TargetType:
-    target_col = classification_train_data[target_name]
-    num_of_values = len(target_col.unique())
-    return TargetType.BINARY if num_of_values == 2 else TargetType.MULTICLASS
+def get_dataset_name(dataset_path: Path) -> str:  # FIXME
+    dataset_file_name = dataset_path.name
+    return dataset_file_name.split("_train.csv")[0]
 
 
 @click.command()
 @click.option(
-    "--openml_study_id",
+    "--datarobot_mbtest_yaml_path",
     type=int,
     required=True,
-    help="OpenML study id (study contains tasks and datasets)",
-)
-@click.option(
-    "--training_metric",
-    type=click.Choice([metric_type.name for metric_type in MetricType]),
-    required=True,
-    help="Metric used for training",
-)
-@click.option(
-    "--evaluation_metrics",
-    type=str,
-    required=True,
-    help="Metric used for evaluation",
+    help="Path to a DataRobot mbtest yaml file",
 )
 @click.option(
     "--output_report_path",
@@ -81,50 +63,44 @@ def infer_classification_target_type(
     help="Device type",
 )
 @click.option(
-    "--openml_task_names_to_exclude",
+    "--dataset_names_to_exclude",
     type=str,
     required=False,
     default="",
-    help="names of tasks to be excluded from testings",
+    help="names of datasets to be excluded from testings",
 )
-
 def run_cli(
-    openml_study_id: int,
-    training_metric: str,
-    evaluation_metrics: str,
+    datarobot_mbtest_yaml_path: str,
     output_report_path: str,
     folder_of_pretrained_models: str,
     use_tabpfn_extension: bool,
     device_type: str,
-    openml_task_names_to_exclude: str,
+    dataset_names_to_exclude: str,
 ) -> None:
+    datarobot_mbtest_configs = DataRobotMBTestDatasetConfig.load_from_yaml(
+        Path(datarobot_mbtest_yaml_path)
+    )
     folder_of_pretrained_models = (
         Path(folder_of_pretrained_models) if folder_of_pretrained_models else None
     )
 
-    openml_study = get_openml_study(openml_study_id)
-    logger.info(f"Total {len(openml_study.tasks)} task(s) to test.")
+    logger.info(f"Total {len(datarobot_mbtest_configs)} task(s) to test.")
     dataset_test_reports: List[TabPFNTestReport] = []
-    openml_task_names_to_exclude = set(openml_task_names_to_exclude.split(","))
-    for openml_task_id in openml_study.tasks:
-        openml_task = get_openml_task(openml_task_id)
-        openml_dataset = openml_task.get_dataset()
-        openml_dataset_name = openml_dataset.name
-        if openml_dataset_name in openml_task_names_to_exclude:
-            logger.info(f"Skipped task: {openml_dataset_name} is not supported by TabPFN.")
+    dataset_names_to_exclude = set(dataset_names_to_exclude.split(","))
+    for mbtest_config in datarobot_mbtest_configs:
+        dataset_name = get_dataset_name(Path(mbtest_config.train_dataset_path))  # FIXME
+        if dataset_name in dataset_names_to_exclude:
+            logger.info(f"Skipped task: {dataset_name} is not supported by TabPFN.")
             continue
 
-        train_dataframe, test_dataframe = get_train_test_sets_of_openml_dataset(openml_task)
-        task_target_name = openml_task.target_name
-        if is_classification_task(openml_task):
-            target_type = infer_classification_target_type(train_dataframe, task_target_name)
-        else:
-            target_type = TargetType.REGRESSION
-        dataset = Dataset(train_dataframe, test_dataframe, task_target_name)
-        logger.info(f"Processing task {openml_dataset_name}")
+        train_dataframe = pd.read_csv(mbtest_config.train_dataset_path)
+        test_dataframe = pd.read_csv(mbtest_config.pred_dataset_path)
+        target_name = mbtest_config.target
+        target_type = mbtest_config.rtype
+        dataset = Dataset(train_dataframe, test_dataframe, target_name)
+        logger.info(f"Processing task {dataset_name}")
 
         # cross validation
-        training_metric_type = MetricType.from_string(training_metric)
         model_wrapper = get_tabpfn_model_wrapper(
             target_type,
             folder_of_pretrained_models,
@@ -138,7 +114,7 @@ def run_cli(
                 dataset,
                 5,
                 target_type,
-                training_metric_type,
+                mbtest_config.metric,
             )
             # train
             model_wrapper = get_tabpfn_model_wrapper(
@@ -156,25 +132,21 @@ def run_cli(
             with TimeProfiler(holdout_predict_time_profile):
                 prediction_outputs = model_wrapper.inference(dataset)
         except:
-            logger.exception(f"CV fails: {openml_dataset.name}")
+            logger.exception(f"CV fails: {dataset_name}")
             continue
 
-        evaluation_metric_types = [
-            MetricType.from_string(metric) for metric in evaluation_metrics.split(",")
-        ]
         holdout_evaluation_results = [
             evaluate_on_inference_result(
                 target_type,
-                evaluation_metric_type,
+                mbtest_config.metric,
                 prediction_outputs,
             )
-            for evaluation_metric_type in evaluation_metric_types
         ]
 
         # analysis and report
         dataset_test_reports.append(
             TabPFNTestReport(
-                openml_dataset.name,
+                dataset_name,
                 cv_evaluation_results,
                 holdout_evaluation_results,
                 [train_fit_time_profile],
