@@ -104,13 +104,17 @@ class TabPFNTestReport:
         )
 
     def to_test_result(self) -> TestResultV2:
-        model_score_metrics = [
-            ModelScoreMetrics(
-                self.get_cv_metric_type(),
-                Partition.CV,
-                self.median_cv_score().item(),
+        model_score_metrics = []
+        if self.cv_evaluation_results:
+            model_score_metrics.extend(
+                [
+                    ModelScoreMetrics(
+                        self.get_cv_metric_type(),
+                        Partition.CV,
+                        self.median_cv_score().item(),
+                    )
+                ]
             )
-        ]
         model_score_metrics.extend(
             [
                 ModelScoreMetrics(

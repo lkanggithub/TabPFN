@@ -68,6 +68,13 @@ def get_dataset_name(dataset_path: Path) -> str:  # FIXME
     default="",
     help="names of datasets to be excluded from testings",
 )
+@click.option(
+    "--run_cv",
+    type=bool,
+    required=False,
+    default=False,
+    help="If True, CV is run",
+)
 def run_cli(
     datarobot_mbtest_yaml_path: str,
     output_report_path: str,
@@ -75,6 +82,7 @@ def run_cli(
     use_tabpfn_extension: bool,
     device_type: str,
     dataset_names_to_exclude: str,
+    run_cv: bool,
 ) -> None:
     datarobot_mbtest_configs = DataRobotMBTestDatasetConfig.load_from_yaml(
         Path(datarobot_mbtest_yaml_path)
@@ -89,7 +97,7 @@ def run_cli(
     for mbtest_config in datarobot_mbtest_configs:
         dataset_name = get_dataset_name(Path(mbtest_config.train_dataset_path))  # FIXME
         if dataset_name in dataset_names_to_exclude:
-            logger.info(f"Skipped task: {dataset_name} is not supported by TabPFN.")
+            logger.info(f"Skipped task: {dataset_name}.")
             continue
 
         train_dataframe = pd.read_csv(mbtest_config.train_dataset_path)
@@ -100,21 +108,23 @@ def run_cli(
         logger.info(f"Processing task {dataset_name}")
 
         # cross validation
-        model_wrapper = get_tabpfn_model_wrapper(
-            target_type,
-            folder_of_pretrained_models,
-            use_tabpfn_extension,
-            False,
-            DeviceType.from_string(device_type),
-        )
         try:
-            cv_evaluation_results = evaluate_with_cv(
-                model_wrapper,
-                dataset,
-                5,
-                target_type,
-                mbtest_config.metric,
-            )
+            cv_evaluation_results = []
+            if run_cv:
+                model_wrapper = get_tabpfn_model_wrapper(
+                    target_type,
+                    folder_of_pretrained_models,
+                    use_tabpfn_extension,
+                    False,
+                    DeviceType.from_string(device_type),
+                )
+                cv_evaluation_results = evaluate_with_cv(
+                    model_wrapper,
+                    dataset,
+                    5,
+                    target_type,
+                    mbtest_config.metric,
+                )
             # train
             model_wrapper = get_tabpfn_model_wrapper(
                 target_type,

@@ -40,7 +40,11 @@ class ModelWrapper:
 
     def inference(self, dataset: Dataset) -> PredictionOutputs:
         inference_input_data = dataset.get_test_data_x()
-        prediction_values = self.model.predict(inference_input_data)
+        prediction_values = (
+            self.model.predict(inference_input_data)
+            if self.is_regressor
+            else None
+        )
         prediction_proba_values = (
             self.model.predict_proba(inference_input_data)
             if not self.is_regressor

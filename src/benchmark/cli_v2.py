@@ -87,7 +87,13 @@ def infer_classification_target_type(
     default="",
     help="names of tasks to be excluded from testings",
 )
-
+@click.option(
+    "--run_cv",
+    type=bool,
+    required=False,
+    default=False,
+    help="If True, CV is run",
+)
 def run_cli(
     openml_study_id: int,
     training_metric: str,
@@ -97,6 +103,7 @@ def run_cli(
     use_tabpfn_extension: bool,
     device_type: str,
     openml_task_names_to_exclude: str,
+    run_cv: bool,
 ) -> None:
     folder_of_pretrained_models = (
         Path(folder_of_pretrained_models) if folder_of_pretrained_models else None
@@ -123,23 +130,25 @@ def run_cli(
         dataset = Dataset(train_dataframe, test_dataframe, task_target_name)
         logger.info(f"Processing task {openml_dataset_name}")
 
-        # cross validation
-        training_metric_type = MetricType.from_string(training_metric)
-        model_wrapper = get_tabpfn_model_wrapper(
-            target_type,
-            folder_of_pretrained_models,
-            use_tabpfn_extension,
-            False,
-            DeviceType.from_string(device_type),
-        )
         try:
-            cv_evaluation_results = evaluate_with_cv(
-                model_wrapper,
-                dataset,
-                5,
-                target_type,
-                training_metric_type,
-            )
+            # cross validation
+            cv_evaluation_results = []
+            if run_cv:
+                training_metric_type = MetricType.from_string(training_metric)
+                model_wrapper = get_tabpfn_model_wrapper(
+                    target_type,
+                    folder_of_pretrained_models,
+                    use_tabpfn_extension,
+                    False,
+                    DeviceType.from_string(device_type),
+                )
+                cv_evaluation_results = evaluate_with_cv(
+                    model_wrapper,
+                    dataset,
+                    5,
+                    target_type,
+                    training_metric_type,
+                )
             # train
             model_wrapper = get_tabpfn_model_wrapper(
                 target_type,
