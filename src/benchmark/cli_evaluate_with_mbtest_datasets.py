@@ -8,6 +8,7 @@ import pandas as pd
 from dr_model_benchmark.common.analysis.entities import TestResultV2
 from dr_model_benchmark.common.analysis.enums import Partition
 from dr_model_benchmark.common.enums import DeviceType
+from dr_model_benchmark.common.profile.entities import Seconds
 from dr_model_benchmark.common.profile.entities import TimeProfile
 from dr_model_benchmark.common.profile.utils import TimeProfiler
 from dr_model_benchmark.common.entities import DataRobotMBTestDatasetConfig
@@ -153,6 +154,9 @@ def run_cli(
         ]
 
         # analysis and report
+        holdout_predict_time_profile.time_ellipse = Seconds(
+            holdout_predict_time_profile.time_ellipse.to_float() / len(test_dataframe)
+        )
         dataset_test_reports.append(
             TabPFNTestReport(
                 dataset_name,
